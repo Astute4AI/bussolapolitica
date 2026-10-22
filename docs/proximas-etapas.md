@@ -10,7 +10,7 @@ Em ordem de prioridade sugerida. Cada item diz por que importa e o que envolve.
 
 ## Infra e manutenção
 
-1. **Deploy na Vercel** com os rewrites já configurados em `vercel.json`; validar que os proxies funcionam em produção (especialmente o CEAPS de ~10 MB). Com o repositório no GitHub, basta importar o projeto na Vercel: cada commit do workflow diário gera um deploy novo.
+1. **Deploy de produção na Vercel**: o projeto já está ligado ao repositório e o preview do PR #1 foi validado em 22/10/2026 (os três proxies respondem, inclusive a CEAPS de 6,5 MB; páginas de deputado, senador e `/atencao` batem com os números conferidos localmente). Falta fazer o merge na `main` para publicar em produção e decidir se o site fica público (hoje os previews exigem login da Vercel).
 2. **Testes automatizados** para as regras de alerta (casos sintéticos: contrato mensal não é repetição, restituição anula duplicidade, passagem por UF, empresa aberta depois do pagamento) e para a normalização das APIs.
 
 ## Alertas de gastos — fase 2
