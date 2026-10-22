@@ -3,7 +3,7 @@
 
 import type { Casa } from '../lib/casas.ts'
 
-export type RegraId = 'acima-dos-pares' | 'concentracao-fornecedor' | 'documento-repetido' | 'pico-dezembro'
+export type RegraId = 'acima-dos-pares' | 'concentracao-fornecedor' | 'documento-repetido' | 'pico-dezembro' | 'cadastro-fornecedor'
 
 export interface AlertaAcimaDosPares {
   regra: 'acima-dos-pares'
@@ -47,7 +47,28 @@ export interface AlertaPicoDezembro {
   razao: number
 }
 
-export type Alerta = AlertaAcimaDosPares | AlertaConcentracao | AlertaDocumentoRepetido | AlertaPicoDezembro
+export interface AlertaCadastroFornecedor {
+  regra: 'cadastro-fornecedor'
+  /** Empresa aberta pouco antes (ou depois) do primeiro pagamento, ou com situação irregular na Receita. */
+  motivo: 'aberta-recentemente' | 'situacao-irregular'
+  fornecedor: string
+  documento: string
+  /** Total pago pelo parlamentar a esse fornecedor no ano. */
+  valor: number
+  primeiroPagamento: string
+  abertura: string | null
+  /** Dias entre a abertura e o primeiro pagamento (negativo: abriu depois). */
+  diasAntes: number | null
+  situacao: string
+  dataSituacao: string | null
+  /** Motivo informado pela Receita (ex.: encerramento por liquidação voluntária, inaptidão por omissão de declarações). */
+  motivoSituacao: string
+  /** Valor pago depois da data da situação irregular. */
+  valorAposSituacao: number
+  atividade: string
+}
+
+export type Alerta = AlertaAcimaDosPares | AlertaConcentracao | AlertaDocumentoRepetido | AlertaPicoDezembro | AlertaCadastroFornecedor
 
 export interface ParlamentarComAlertas {
   casa: Casa
@@ -86,6 +107,10 @@ export const REGRAS: Record<RegraId, { titulo: string; resumo: string }> = {
     titulo: 'Documento repetido',
     resumo: 'Mesmo fornecedor, mesmo número de documento e mesmo valor lançados mais de uma vez.',
   },
+  'cadastro-fornecedor': {
+    titulo: 'Cadastro do fornecedor',
+    resumo: 'Fornecedor (R$ 20 mil ou mais no ano) aberto até 180 dias antes do primeiro pagamento, ou baixado/inapto na Receita quando foi pago.',
+  },
   'pico-dezembro': {
     titulo: 'Pico em dezembro',
     resumo: 'Gasto de dezembro pelo menos 2× a média dos outros meses, padrão de quem esgota a cota no fim do ano.',
@@ -99,5 +124,6 @@ export function valorDoAlerta(a: Alerta) {
     case 'concentracao-fornecedor': return a.valor
     case 'documento-repetido': return a.valorUnitario * (a.ocorrencias - 1)
     case 'pico-dezembro': return a.valorDezembro - a.mediaOutrosMeses
+    case 'cadastro-fornecedor': return a.motivo === 'situacao-irregular' ? a.valorAposSituacao : a.valor
   }
 }

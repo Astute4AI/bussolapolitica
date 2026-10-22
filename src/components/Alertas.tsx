@@ -42,6 +42,26 @@ function Descricao({ a, casa, ano }: { a: Alerta; casa: Casa; ano: number }) {
           </span>
         </span>
       )
+    case 'cadastro-fornecedor': {
+      const quem = <><strong>{a.fornecedor}</strong> <span className="mudo">({a.documento})</span></>
+      if (a.motivo === 'situacao-irregular') {
+        return (
+          <span>
+            {quem} recebeu {moeda(a.valorAposSituacao)} depois de ficar com situação <strong>{a.situacao.toLowerCase()}</strong> na
+            Receita desde {a.dataSituacao ? dataBr(a.dataSituacao) : '—'}
+            {a.motivoSituacao ? ` (motivo: ${a.motivoSituacao.toLowerCase()})` : ''}. Atividade: {a.atividade}.
+          </span>
+        )
+      }
+      const d = a.diasAntes ?? 0
+      return (
+        <span>
+          {quem} foi aberta em {a.abertura ? dataBr(a.abertura) : '—'},{' '}
+          {d >= 0 ? `${numero(d)} dias antes` : `${numero(-d)} dias depois`} do primeiro pagamento ({dataBr(a.primeiroPagamento)}),
+          e recebeu {moeda(a.valor)} no ano. Atividade: {a.atividade}.
+        </span>
+      )
+    }
     case 'pico-dezembro':
       return (
         <span>

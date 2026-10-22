@@ -16,6 +16,7 @@ on:
   pull_request:
     paths:
       - 'scripts/gerar-alertas.ts'
+      - 'scripts/cnpj.ts'
       - 'src/api/alertas.ts'
       - '.github/workflows/atualizar-alertas.yml'
 
@@ -29,7 +30,8 @@ concurrency:
 jobs:
   gerar:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Até 1.500 consultas de CNPJ por execução, em sequência (~15 min no pior caso)
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -41,22 +43,24 @@ jobs:
       - name: Gerar alertas
         env:
           ANOS: ${{ inputs.anos }}
+          # Em pull requests só valida: poucas consultas de CNPJ
+          LIMITE: ${{ github.event_name == 'pull_request' && '20' || '1500' }}
         run: |
           if [ -n "$ANOS" ]; then
-            npm run dados:alertas -- --anos "$ANOS"
+            npm run dados:alertas -- --anos "$ANOS" --limite-cnpj "$LIMITE"
           else
-            npm run dados:alertas
+            npm run dados:alertas -- --limite-cnpj "$LIMITE"
           fi
 
       - name: Commit se houver mudanças
         if: github.event_name != 'pull_request'
         run: |
-          if git diff --quiet -- public/dados; then
+          if git diff --quiet -- public/dados dados; then
             echo "Sem mudanças nos dados."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/dados
+          git add public/dados dados
           git commit -m "Atualiza pontos de atenção ($(date -u +%Y-%m-%d))"
           git push

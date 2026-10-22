@@ -7,8 +7,13 @@ Vite 8, React 19, TypeScript, TanStack Query (cache e estado das requisições),
 ## Organização
 
 ```
+.github/workflows/
+  ci.yml                # lint + build em pushes e pull requests
+  atualizar-alertas.yml # diário: regenera os alertas e faz commit se mudarem
 scripts/
   gerar-alertas.ts      # baixa os arquivos anuais da cota e gera public/dados/alertas-*.json
+  cnpj.ts               # consulta cadastral de CNPJ (Minha Receita) com cache
+dados/cnpj.json         # cache de CNPJ (versionado; não é servido pelo app)
 public/dados/           # saída do script (estático, servido pelo app)
 src/
   api/

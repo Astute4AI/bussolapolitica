@@ -76,7 +76,7 @@ export function Atencao() {
       <div className="titulo-pagina">
         <h1>Pontos de atenção nos gastos</h1>
         <p>
-          Despesas da cota parlamentar de deputados e senadores que fogem do padrão, segundo quatro regras automáticas.
+          Despesas da cota parlamentar de deputados e senadores que fogem do padrão, segundo cinco regras automáticas.
           Calculado sobre os arquivos anuais completos das duas casas.
         </p>
       </div>
@@ -115,7 +115,7 @@ export function Atencao() {
 
       {alertas.error ? <Erro erro={alertas.error} tentar={() => alertas.refetch()} /> : alertas.isLoading ? <Carregando /> : (
         <>
-          <div className="kpis">
+          <div className="kpis kpis-5">
             {(Object.keys(REGRAS) as RegraId[]).map((r) => (
               <button key={r} className="kpi kpi-botao" aria-pressed={regra === r} title={REGRAS[r].resumo}
                 onClick={() => definir('regra', regra === r ? '' : r)}>

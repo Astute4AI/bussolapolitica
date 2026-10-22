@@ -9,6 +9,7 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { unzipSync, strFromU8 } from 'fflate'
+import { ehCadastro, enriquecer, matrizDe, type Cadastro } from './cnpj.ts'
 import type {
   Alerta, AlertaDocumentoRepetido, ArquivoAlertas, IndiceAlertas, ParlamentarComAlertas,
 } from '../src/api/alertas.ts'
@@ -17,6 +18,7 @@ import type { Casa } from '../src/lib/casas.ts'
 const RAIZ = new URL('..', import.meta.url).pathname
 const CACHE = join(RAIZ, 'node_modules/.cache/politicosbrasil')
 const SAIDA = join(RAIZ, 'public/dados')
+const CACHE_CNPJ = join(RAIZ, 'dados/cnpj.json')
 const VALIDADE_CACHE = 12 * 60 * 60 * 1000
 
 const FONTES: Record<Casa, (ano: number) => string> = {
@@ -31,6 +33,8 @@ const PARES = { razaoMinima: 3, percentil: 0.95, valorMinimo: 20_000, grupoMinim
 const CONCENTRACAO = { participacaoMinima: 0.4, valorMinimo: 50_000 }
 const REPETIDO = { valorMinimo: 100 }
 const DEZEMBRO = { razaoMinima: 2, valorMinimo: 30_000, mesesMinimos: 6 }
+// Só fornecedores relevantes são consultados na Receita (ver docs)
+const CADASTRO = { valorMinimo: 20_000, diasRecente: 180, consultasPorExecucao: 1500 }
 
 // Categorias em que a regra não faz sentido (ver docs/alertas-de-gastos.md)
 const ehPassagem = (t: string) => /^passage/i.test(t)
@@ -341,13 +345,64 @@ function picoDezembro(itens: Lancamento[], achados: Achados) {
   }
 }
 
-function analisar(casa: Casa, itens: Lancamento[], parcial: boolean): ParlamentarComAlertas[] {
+/** Pares parlamentar × CNPJ que recebem a consulta cadastral (passagens ficam de fora). */
+function paresRelevantes(itens: Lancamento[]) {
+  const m = somaPor(itens.filter((l) => l.documento.length === 14 && !ehPassagem(l.tipo)), (l) => `${l.id}\u0000${l.documento}`)
+  return [...m].filter(([, v]) => v >= CADASTRO.valorMinimo).map(([k, valor]) => {
+    const [id, cnpj] = k.split('\u0000')
+    return { id: Number(id), cnpj, valor }
+  })
+}
+
+function cadastroFornecedor(itens: Lancamento[], cadastros: Map<string, Cadastro>, achados: Achados) {
+  const porPar = new Map<string, Lancamento[]>()
+  for (const l of itens) {
+    if (l.documento.length !== 14 || ehPassagem(l.tipo)) continue
+    const k = `${l.id}\u0000${l.documento}`
+    porPar.set(k, [...(porPar.get(k) ?? []), l])
+  }
+  for (const { id, cnpj, valor } of paresRelevantes(itens)) {
+    const c = cadastros.get(cnpj)
+    if (!c) continue
+    const lancamentos = porPar.get(`${id}\u0000${cnpj}`)!.filter((l) => l.data)
+    if (!lancamentos.length) continue
+    const primeiro = lancamentos.reduce((m, l) => (l.data < m ? l.data : m), lancamentos[0].data)
+    const base = {
+      regra: 'cadastro-fornecedor' as const, fornecedor: c.razaoSocial, documento: formatarDocumento(cnpj), valor: centavos(valor),
+      primeiroPagamento: primeiro, abertura: c.abertura, situacao: c.situacao, dataSituacao: c.dataSituacao,
+      motivoSituacao: c.motivoSituacao ?? '', atividade: c.atividade,
+    }
+    // Situação irregular (baixada, inapta, suspensa, nula) antes de algum pagamento
+    // Incorporação, fusão e cisão: a empresa continua sob outro CNPJ, não é irregularidade
+    const reorganizacao = /^(INCORPORACAO|FUSAO|CISAO)/.test(c.motivoSituacao ?? '')
+    if (c.situacao !== 'ATIVA' && c.dataSituacao && !reorganizacao) {
+      const depois = lancamentos.filter((l) => l.data >= c.dataSituacao!).reduce((s, l) => s + l.valor, 0)
+      if (depois > 0) {
+        registrar(achados, id, { ...base, motivo: 'situacao-irregular', diasAntes: null, valorAposSituacao: centavos(depois) })
+        continue
+      }
+    }
+    // Aberta pouco antes do primeiro pagamento do ano (ou depois dele, o que não deveria acontecer)
+    // Idade da empresa: data de abertura da matriz (sem a matriz no cache, a filial não é avaliada)
+    const matriz = matrizDe(cnpj)
+    const abertura = matriz ? cadastros.get(matriz)?.abertura : c.abertura
+    if (abertura) {
+      const diasAntes = Math.round((Date.parse(primeiro) - Date.parse(abertura)) / 86_400_000)
+      if (diasAntes <= CADASTRO.diasRecente) {
+        registrar(achados, id, { ...base, abertura, motivo: 'aberta-recentemente', diasAntes, valorAposSituacao: 0 })
+      }
+    }
+  }
+}
+
+function analisar(casa: Casa, itens: Lancamento[], parcial: boolean, cadastros: Map<string, Cadastro>): ParlamentarComAlertas[] {
   const totais = somaPor(itens, (l) => l.id)
   const achados: Achados = new Map()
   acimaDosPares(casa, itens, achados)
   concentracaoFornecedor(itens, totais, achados)
   documentoRepetido(itens, achados)
   if (!parcial) picoDezembro(itens, achados)
+  cadastroFornecedor(itens, cadastros, achados)
 
   // Dados mais recentes do parlamentar (partido pode mudar ao longo do ano)
   const ultimo = new Map<number, Lancamento>()
@@ -387,11 +442,26 @@ async function main() {
   const geradoEm = new Date().toISOString()
   let mudou = false
 
+  // Lê todos os anos antes, para consultar os CNPJs de uma vez só
+  const dados = new Map<number, { camara: Lancamento[]; senado: Lancamento[] }>()
+  for (const ano of anos) {
+    const [camara, senado] = await Promise.all([lerCamara(ano), lerSenado(ano, senadores)])
+    dados.set(ano, { camara, senado })
+  }
+  const argLimite = process.argv.indexOf('--limite-cnpj')
+  const limite = argLimite > 0 ? Number(process.argv[argLimite + 1]) : CADASTRO.consultasPorExecucao
+  const fornecedores = [...dados.values()].flatMap((d) => [...paresRelevantes(d.camara), ...paresRelevantes(d.senado)].map((p) => p.cnpj))
+  // Filiais: consulta também a matriz, que tem a data de abertura da empresa
+  const cnpjs = [...fornecedores, ...fornecedores.map(matrizDe).filter((m): m is string => !!m)]
+  const { cache, faltam } = await enriquecer(CACHE_CNPJ, cnpjs, limite)
+  if (faltam > 0) console.log(`  ${faltam} CNPJs ficam para a próxima execução (limite de ${limite} consultas)`)
+  const cadastros = new Map(Object.entries(cache).filter((e): e is [string, Cadastro] => ehCadastro(e[1])))
+
   for (const ano of anos) {
     console.log(`Ano ${ano}`)
     const parcial = ano === anoAtual
-    const [camara, senado] = await Promise.all([lerCamara(ano), lerSenado(ano, senadores)])
-    const parlamentares = [...analisar('camara', camara, parcial), ...analisar('senado', senado, parcial)]
+    const { camara, senado } = dados.get(ano)!
+    const parlamentares = [...analisar('camara', camara, parcial, cadastros), ...analisar('senado', senado, parcial, cadastros)]
       .sort((a, b) => b.alertas.length - a.alertas.length || b.totalAno - a.totalAno)
     const arquivo: ArquivoAlertas = {
       ano, parcial, geradoEm,
