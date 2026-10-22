@@ -121,6 +121,7 @@ button, input, select { font: inherit; color: inherit; }
 
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .kpis-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .kpi { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio); padding: 14px 16px; box-shadow: var(--sombra); min-width: 0; }
 .kpi-rotulo { color: var(--texto-2); font-size: 13px; }
 .kpi-valor { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -240,12 +241,12 @@ a.etiqueta { color: var(--acento); }
 
 /* ---------- Responsivo ---------- */
 @media (max-width: 1000px) {
-  .kpis-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpis-6, .kpis-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 800px) {
   .grade-2 { grid-template-columns: minmax(0, 1fr); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .kpis-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis-6, .kpis-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .perfil { flex-direction: column; }
   .multiplos { grid-template-columns: minmax(0, 1fr); }
 }

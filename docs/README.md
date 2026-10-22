@@ -21,3 +21,5 @@ npm run lint
 npm run dados:alertas   # regenera public/dados/alertas-*.json (ano anterior e atual)
 npm run dados:alertas -- --anos 2023,2024,2025,2026
 ```
+
+Repositório: https://github.com/Astute4AI/bussolapolitica. Os alertas são atualizados todo dia por GitHub Action.

@@ -2,27 +2,29 @@
 
 Em ordem de prioridade sugerida. Cada item diz por que importa e o que envolve.
 
+## Feito
+
+- ~~Colocar o projeto em git~~: https://github.com/Astute4AI/bussolapolitica
+- ~~Atualização automática dos alertas~~: workflow diário (`atualizar-alertas.yml`) + CI (`ci.yml`)
+- ~~Cruzamento com a Receita (CNPJ)~~: regra "Cadastro do fornecedor" com cache versionado
+
 ## Infra e manutenção
 
-1. **Colocar o projeto em git** e definir onde ele vive (GitHub). É pré-requisito para o item 2 e para revisar mudanças.
-2. **Atualização automática dos alertas.** Hoje `public/dados/` só muda quando alguém roda `npm run dados:alertas`. Opções:
-   - GitHub Action agendada (diária) que roda o script e faz commit dos JSON, disparando o deploy;
-   - ou rodar o script no build da Vercel (`prebuild`), o que deixa o build dependente das APIs externas.
-   Recomendação: GitHub Action diária.
-3. **Deploy na Vercel** com os rewrites já configurados em `vercel.json`; validar que os proxies funcionam em produção (especialmente o CEAPS de ~10 MB).
-4. **Testes automatizados** para as regras de alerta (casos sintéticos: contrato mensal não é repetição, restituição anula duplicidade, passagem por UF) e para a normalização das APIs.
+1. **Deploy de produção na Vercel**: o projeto já está ligado ao repositório e o preview do PR #1 foi validado em 22/10/2026 (os três proxies respondem, inclusive a CEAPS de 6,5 MB; páginas de deputado, senador e `/atencao` batem com os números conferidos localmente). Falta fazer o merge na `main` para publicar em produção e decidir se o site fica público (hoje os previews exigem login da Vercel).
+2. **Testes automatizados** para as regras de alerta (casos sintéticos: contrato mensal não é repetição, restituição anula duplicidade, passagem por UF, empresa aberta depois do pagamento) e para a normalização das APIs.
 
 ## Alertas de gastos — fase 2
 
-5. **Normalizar pelo teto da cota de cada estado** (Câmara) na regra "acima dos pares", em vez de comparar valores absolutos nacionalmente.
-6. **Fornecedor ligado a vários gabinetes**: mesmo CNPJ recebendo de muitos parlamentares, especialmente com valores idênticos.
-7. **Cruzamento com a Receita (CNPJ)**: data de abertura (empresa aberta pouco antes do primeiro pagamento), situação cadastral (baixada/inapta), atividade principal incompatível com a despesa. Requer API externa de CNPJ (ex.: BrasilAPI ou Minha Receita) e cache, pois são milhares de CNPJs.
-8. **Série histórica por parlamentar**: alertas de vários anos juntos na página do parlamentar.
-9. **Feedback de falso positivo**: permitir marcar um alerta como "explicado" com uma nota/fonte, para melhorar as regras.
+3. **Normalizar pelo teto da cota de cada estado** (Câmara) na regra "acima dos pares". **Bloqueado**: falta a tabela oficial vigente ("Valor da Cota por Federação"; a página da Câmara exige login). Impacto medido em 2025: 9 de 72 alertas mudam. Com a tabela em mãos, basta um arquivo `dados/teto-cota-camara.json` e dividir o valor pelo teto da UF antes de comparar.
+4. **Atividade incompatível**: atividade principal do fornecedor (já no cache de CNPJ) que não combina com o tipo de despesa (ex.: posto de combustível em "consultoria"). Exige uma tabela de compatibilidade CNAE × categoria.
+5. **Fornecedor ligado a vários gabinetes**: mesmo CNPJ recebendo de muitos parlamentares, especialmente com valores idênticos.
+6. **Série histórica por parlamentar**: alertas de vários anos juntos na página do parlamentar.
+7. **Feedback de falso positivo**: permitir marcar um alerta como "explicado" com uma nota/fonte, para melhorar as regras.
 
 ## Produto
 
-10. **Performance do período "Legislatura"**: Câmara leva 10–20 s (eventos paginados) e o Senado baixa ~35 MB de CEAPS. Pré-calcular agregados por parlamentar (como nos alertas) resolveria os dois.
-11. **Divisão do bundle** (o JS passa de 500 kB por causa do Recharts): carregar páginas sob demanda com `import()`.
-12. **Votações**: como cada parlamentar votou nas principais matérias, e alinhamento com o partido/governo (o Senado já expõe orientação de bancada).
-13. **Comparação entre casas** (deputado × senador), mostrando só métricas equivalentes (cota, proposições, discursos).
+8. **Performance do período "Legislatura"**: Câmara leva 10–20 s (eventos paginados) e o Senado baixa ~35 MB de CEAPS. Pré-calcular agregados por parlamentar (como nos alertas) resolveria os dois.
+9. **Divisão do bundle** (o JS passa de 500 kB por causa do Recharts): carregar páginas sob demanda com `import()`.
+10. **Votações**: como cada parlamentar votou nas principais matérias, e alinhamento com o partido/governo (o Senado já expõe orientação de bancada).
+11. **Comparação entre casas** (deputado × senador), mostrando só métricas equivalentes (cota, proposições, discursos).
+12. **Virada da legislatura (fev/2027)**: o app e o script assumem a 57ª legislatura (2023–2027); será preciso parametrizar a legislatura.

@@ -1,6 +1,6 @@
 # Histórico
 
-Registro do que foi construído, em ordem. O projeto ainda não está num repositório git.
+Registro do que foi construído, em ordem. Repositório: https://github.com/Astute4AI/bussolapolitica
 
 ## 1. Dashboard da Câmara (out/2026)
 
@@ -33,3 +33,10 @@ Registro do que foi construído, em ordem. O projeto ainda não está num reposi
 - Quatro regras: acima dos pares, fornecedor concentrado, documento repetido, pico em dezembro (calibração em [alertas-de-gastos.md](alertas-de-gastos.md)).
 - Página `/atencao` com filtros e cartão "Pontos de atenção" nas páginas de deputado e senador.
 - Pasta `docs/` criada.
+
+## 5. Git, atualização automática e CNPJ (22/10/2026)
+
+- Projeto publicado em https://github.com/Astute4AI/bussolapolitica (privado).
+- CI (lint + build) e workflow diário que regenera os alertas e faz commit só quando os dados mudam (o script deixou de regravar arquivos sem mudança).
+- Nova regra "Cadastro do fornecedor": consulta na Receita (Minha Receita) dos fornecedores com R$ 20 mil ou mais por parlamentar/ano; alerta empresa aberta até 180 dias antes do primeiro pagamento ou com situação irregular quando foi paga. Cache versionado em `dados/cnpj.json`.
+- Normalização pelo teto da cota por UF medida (9 de 72 alertas mudariam em 2025), mas não aplicada por falta da tabela oficial verificável.
