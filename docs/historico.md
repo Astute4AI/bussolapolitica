@@ -40,3 +40,4 @@ Registro do que foi construído, em ordem. Repositório: https://github.com/Astu
 - CI (lint + build) e workflow diário que regenera os alertas e faz commit só quando os dados mudam (o script deixou de regravar arquivos sem mudança).
 - Nova regra "Cadastro do fornecedor": consulta na Receita (Minha Receita) dos fornecedores com R$ 20 mil ou mais por parlamentar/ano; alerta empresa aberta até 180 dias antes do primeiro pagamento ou com situação irregular quando foi paga. Cache versionado em `dados/cnpj.json`.
 - Normalização pelo teto da cota por UF medida (9 de 72 alertas mudariam em 2025), mas não aplicada por falta da tabela oficial verificável.
+- Produção na Vercel em https://bussolapolitica.astute4ai.com; primeira execução do workflow diário na `main` com commit automático dos dados.
