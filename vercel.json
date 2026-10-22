@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/api/camara/:path*", "destination": "https://dadosabertos.camara.leg.br/api/v2/:path*" },
+    { "source": "/api/senado-legis/:path*", "destination": "https://legis.senado.leg.br/dadosabertos/:path*" },
+    { "source": "/api/senado-adm/:path*", "destination": "https://adm.senado.gov.br/adm-dadosabertos/api/v1/:path*" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
