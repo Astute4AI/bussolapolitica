@@ -361,6 +361,19 @@ function analisar(casa: Casa, itens: Lancamento[], parcial: boolean): Parlamenta
 
 // ---- Principal ----
 
+/**
+ * Grava o JSON só se o conteúdo (ignorando `geradoEm`) mudou, preservando a data anterior.
+ * Assim a atualização agendada não gera commit quando os dados não mudam.
+ */
+async function gravarSeMudou<T extends { geradoEm: string }>(caminho: string, novo: T): Promise<boolean> {
+  try {
+    const antigo = JSON.parse(await readFile(caminho, 'utf8')) as T
+    if (JSON.stringify({ ...antigo, geradoEm: '' }) === JSON.stringify({ ...novo, geradoEm: '' })) return false
+  } catch { /* arquivo novo ou ilegível */ }
+  await writeFile(caminho, JSON.stringify(novo))
+  return true
+}
+
 async function main() {
   const anoAtual = new Date().getFullYear()
   const arg = process.argv.indexOf('--anos')
@@ -372,6 +385,7 @@ async function main() {
   await mkdir(SAIDA, { recursive: true })
   const senadores = await senadoresDaLegislatura()
   const geradoEm = new Date().toISOString()
+  let mudou = false
 
   for (const ano of anos) {
     console.log(`Ano ${ano}`)
@@ -384,11 +398,13 @@ async function main() {
       fontes: { camara: FONTES.camara(ano), senado: FONTES.senado(ano) },
       parlamentares,
     }
-    await writeFile(join(SAIDA, `alertas-${ano}.json`), JSON.stringify(arquivo))
+    const gravou = await gravarSeMudou(join(SAIDA, `alertas-${ano}.json`), arquivo)
+    mudou ||= gravou
     const porRegra = new Map<string, number>()
     for (const p of parlamentares) for (const a of p.alertas) porRegra.set(a.regra, (porRegra.get(a.regra) ?? 0) + 1)
     console.log(`  ${camara.length} lançamentos da Câmara, ${senado.length} do Senado`)
     console.log(`  ${parlamentares.length} parlamentares com alertas:`, Object.fromEntries(porRegra))
+    console.log(gravou ? '  arquivo atualizado' : '  sem mudanças')
   }
 
   // Índice com todos os anos já gerados (inclusive de execuções anteriores)
@@ -396,8 +412,13 @@ async function main() {
   for (let a = 2023; a <= anoAtual; a++) {
     try { await stat(join(SAIDA, `alertas-${a}.json`)); existentes.push(a) } catch { /* não gerado */ }
   }
-  const indice: IndiceAlertas = { anos: existentes.sort((a, b) => b - a), geradoEm }
-  await writeFile(join(SAIDA, 'indice.json'), JSON.stringify(indice))
+  // A data do índice só avança quando algum ano mudou
+  const caminhoIndice = join(SAIDA, 'indice.json')
+  let dataIndice = geradoEm
+  if (!mudou) {
+    try { dataIndice = (JSON.parse(await readFile(caminhoIndice, 'utf8')) as IndiceAlertas).geradoEm } catch { /* sem índice */ }
+  }
+  await gravarSeMudou(caminhoIndice, { anos: existentes.sort((a, b) => b - a), geradoEm: dataIndice } satisfies IndiceAlertas)
 }
 
 main().catch((e) => {

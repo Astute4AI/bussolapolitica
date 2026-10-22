@@ -1,0 +1,62 @@
+# Regenera public/dados/alertas-*.json a partir dos arquivos anuais da Câmara e do Senado.
+# Na main (agendado ou manual) faz commit quando os dados mudam; em pull requests que
+# mexem no script só valida que a geração funciona. Metodologia: docs/alertas-de-gastos.md
+name: Atualizar pontos de atenção
+
+on:
+  schedule:
+    # 10:00 UTC (07:00 em Brasília): a Câmara publica os arquivos do dia por volta das 06:30 UTC
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    inputs:
+      anos:
+        description: 'Anos separados por vírgula (vazio = ano anterior e atual)'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'scripts/gerar-alertas.ts'
+      - 'src/api/alertas.ts'
+      - '.github/workflows/atualizar-alertas.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: atualizar-alertas
+  cancel-in-progress: false
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Gerar alertas
+        env:
+          ANOS: ${{ inputs.anos }}
+        run: |
+          if [ -n "$ANOS" ]; then
+            npm run dados:alertas -- --anos "$ANOS"
+          else
+            npm run dados:alertas
+          fi
+
+      - name: Commit se houver mudanças
+        if: github.event_name != 'pull_request'
+        run: |
+          if git diff --quiet -- public/dados; then
+            echo "Sem mudanças nos dados."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/dados
+          git commit -m "Atualiza pontos de atenção ($(date -u +%Y-%m-%d))"
+          git push
